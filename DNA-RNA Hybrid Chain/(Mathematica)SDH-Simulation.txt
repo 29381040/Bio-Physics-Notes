@@ -1,0 +1,52 @@
+In[557]:= ClearAll
+\[Tau]=1/10;          (*Dead zone斜率*)
+ki=1;          (*积分系数*)
+k=1/(\[Tau] ki);          (*k=1/(\[Tau] ki)*)
+x0=5;          (*最大拉伸长度*)
+T0=5;          (*半周期*)
+v0=x0/T0;          (*等效拉动速度v0=x0/T0*)
+F0=1;          (*阈值力*)
+
+(*三角波输入*)
+sigma[t_]:=TriangleWave[{-(x0/T0),x0/T0},t/(4*T0)]
+(*v0 T0 Sin[Pi/(2T0)t]*)
+
+(*死区函数\Delta(\eta)*)
+delta[eta_]:=Piecewise[{{1/(ki \[Tau])*(eta-F0),eta>F0},{0,-F0<=eta<=F0},{1/(ki \[Tau])*(eta+F0),eta<-F0}}]
+
+(*SDH方程*)
+equation=eta'[t]==ki*(sigma[t]-delta[eta[t]]);
+
+(*初始条件*)
+initialCondition=eta[0]==0;
+
+(*数值求解微分方程*)
+solution=NDSolve[{equation,initialCondition},eta,{t,0,15*T0},MaxSteps->10000,PrecisionGoal->8,AccuracyGoal->8];
+etaFunc[t_]:=eta[t]/. solution[[1]];
+
+(*SDH输出*)
+phiD[t_]:=etaFunc[t]-(1/k)*sigma[t];
+Print["模拟参数: \[Tau] = ",\[Tau],", ki = ",ki,", x0 = ",x0,", T0 = ",T0,", v0 = ",v0,", k = ",k];
+
+(*输入信号\sigma(t)*)
+Plot[sigma[t],{t,0,5*T0},AxesLabel->{"t","\[Sigma](t)"},PlotLabel->"\[Sigma](t)",PlotStyle->{Blue,Thick},GridLines->Automatic,ImageSize->400]
+
+(*状态反馈变量\eta(t)*)
+Plot[etaFunc[t],{t,0,5*T0},AxesLabel->{"t","\[Eta](t)"},PlotLabel->"\[Eta](t)",PlotStyle->{Red,Thick},GridLines->Automatic,ImageSize->400]
+
+(*输出变量\Phi_D(t)*)
+Plot[phiD[t],{t,0,5*T0},AxesLabel->{"t","\[CapitalPhi]_D(t)"},PlotStyle->{Orange,Thick},GridLines->Automatic,ImageSize->400]
+
+(*滞回环*)
+ParametricPlot[{sigma[t],phiD[t]},{t,0,15*T0},PlotLabel->"SDH滞回环",AxesLabel->{"\[Sigma]","\[CapitalPhi]_D"},PlotStyle->{Purple,Thick},AspectRatio->1/GoldenRatio,GridLines->Automatic,PlotRange->All,ImageSize->400]
+
+(*不同ki值下的滞回环*)
+plotHysteresisForDifferentKi[kVal_,v0Val_,T0Val_]:=Module[{kiValues={1,2,5,10},colors,plots,i},colors={Red,Orange,Blue,Purple};
+plots=Table[ki=kiValues[[i]];
+solution=NDSolve[{eta'[t]==ki*(sigma[t]-delta[eta[t]]),eta[0]==0},eta,{t,0,15*T0Val}];
+etaFuncLocal[t_]:=eta[t]/. solution[[1]];
+phiDLocal[t_]:=etaFuncLocal[t]-(1/kVal)*sigma[t];
+ParametricPlot[{sigma[t],phiDLocal[t]},{t,0,15*T0Val},PlotStyle->colors[[i]]],{i,Length[kiValues]}];
+Show[plots,PlotRange->All,GridLines->Automatic,ImageSize->500,AspectRatio->0.8,PlotLabel->"ki值对滞回环的影响 (参数k = "<>ToString[kVal]<>")",AxesLabel->{"\[Sigma]","\[CapitalPhi]_D"},PlotLegends->Placed[LineLegend[Table["ki = "<>ToString[kiValues[[i]]],{i,Length[kiValues]}],LegendLabel->Style["参数值",Bold,12]],{0.8,0.9}]]]
+
+plotHysteresisForDifferentKi[k,v0,T0]
